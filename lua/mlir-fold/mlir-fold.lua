@@ -87,9 +87,40 @@ local function is_error_context(lnum)
   return false
 end
 
+-- Check if buffer contains any IR dump markers (cached per buffer)
+local buffer_has_ir_dumps = {}
+local function has_ir_dumps_in_buffer(bufnr)
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
+
+  -- Return cached result if available
+  if buffer_has_ir_dumps[bufnr] ~= nil then
+    return buffer_has_ir_dumps[bufnr]
+  end
+
+  -- Check first 10000 lines for performance
+  local line_count = vim.api.nvim_buf_line_count(bufnr)
+  local check_limit = math.min(line_count, 10000)
+
+  for i = 1, check_limit do
+    local line = vim.fn.getline(i)
+    if line:match(IR_DUMP_PATTERN) then
+      buffer_has_ir_dumps[bufnr] = true
+      return true
+    end
+  end
+
+  buffer_has_ir_dumps[bufnr] = false
+  return false
+end
+
 -- Custom fold expression for MLIR IR dumps
 local function mlir_fold_expr(lnum)
   local line = vim.fn.getline(lnum)
+
+  -- If buffer has no IR dumps, don't fold anything
+  if not has_ir_dumps_in_buffer() then
+    return "0"
+  end
 
   -- Start a new fold at IR dump markers (including "Failed" passes)
   if line:match(IR_DUMP_PATTERN) then
@@ -122,6 +153,9 @@ end
 -- Setup function for a buffer
 local function setup_buffer_folding(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
+
+  -- Clear cache for this buffer to force re-check
+  buffer_has_ir_dumps[bufnr] = nil
 
   -- Get the window displaying this buffer
   local winid = vim.fn.bufwinid(bufnr)
