@@ -164,6 +164,11 @@ local function setup_buffer_folding(bufnr)
     winid = 0
   end
 
+  -- Preserve diff folds
+  if vim.wo[winid].diff then
+    return
+  end
+
   -- Set up window-local folding options
   vim.wo[winid].foldmethod = 'expr'
   vim.wo[winid].foldexpr = 'v:lua.require("mlir-fold.mlir-fold").fold_expr(v:lnum)'
